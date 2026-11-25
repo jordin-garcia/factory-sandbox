@@ -1,0 +1,36 @@
+name: experimento-llamar-reutilizable
+
+# Tarea 3, Step 13: llamar a un flujo reutilizable de otro repositorio público de la cuenta.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  explicito:
+    uses: jordin-garcia/software-factory/.github/workflows/experimento-reutilizable.yml@experimento/reutilizable
+    permissions:
+      contents: read
+    with:
+      entrada: modo-explicito
+      app-id: ${{ vars.FACTORY_APP_ID }}
+    secrets:
+      FACTORY_APP_PRIVATE_KEY: ${{ secrets.FACTORY_APP_PRIVATE_KEY }}
+
+  heredado:
+    uses: jordin-garcia/software-factory/.github/workflows/experimento-reutilizable.yml@experimento/reutilizable
+    permissions:
+      contents: read
+    with:
+      entrada: modo-inherit
+      app-id: ${{ vars.FACTORY_APP_ID }}
+    secrets: inherit
+
+  sin-secreto:
+    uses: jordin-garcia/software-factory/.github/workflows/experimento-reutilizable.yml@experimento/reutilizable
+    permissions:
+      contents: read
+    with:
+      entrada: modo-sin-secreto
+      app-id: ${{ vars.FACTORY_APP_ID }}

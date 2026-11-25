@@ -1,0 +1,67 @@
+name: experimento-abrir-pr
+
+# Tarea 3, Step 7: abrir un PR con el token de la aplicación y, como control,
+# empujar un commit con GITHUB_TOKEN a la rama de un PR existente.
+on:
+  workflow_dispatch:
+    inputs:
+      identidad:
+        description: "app = crear rama + commit + PR con la aplicación; github_token = empujar un commit a una rama existente con GITHUB_TOKEN"
+        type: choice
+        options: [app, github_token]
+        default: app
+      rama:
+        description: "Rama a crear (app) o a actualizar (github_token)"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  con-app:
+    if: inputs.identidad == 'app'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Token de la aplicación
+        id: token
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          app-id: ${{ vars.FACTORY_APP_ID }}
+          private-key: ${{ secrets.FACTORY_APP_PRIVATE_KEY }}
+      - name: Crear rama, commit y PR
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          RAMA: ${{ inputs.rama }}
+          REPO: ${{ github.repository }}
+          APP_SLUG: ${{ steps.token.outputs.app-slug }}
+        run: |
+          set -euo pipefail
+          echo "app_slug=$APP_SLUG"
+          sha=$(gh api "repos/$REPO/git/ref/heads/main" --jq .object.sha)
+          gh api -X POST "repos/$REPO/git/refs" -f ref="refs/heads/$RAMA" -f sha="$sha" --silent
+          contenido=$(printf 'Experimento %s\n' "$RAMA" | base64 -w0)
+          gh api -X PUT "repos/$REPO/contents/experimentos/$RAMA.txt" \
+            -f message="experimento: $RAMA" -f content="$contenido" -f branch="$RAMA" --silent
+          gh pr create --repo "$REPO" --base main --head "$RAMA" \
+            --title "Experimento $RAMA" --body "PR de experimento (Tarea 3, parte B1), abierto con el token de la aplicación."
+
+  con-github-token:
+    if: inputs.identidad == 'github_token'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Empujar un commit con GITHUB_TOKEN
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RAMA: ${{ inputs.rama }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          ruta="experimentos/control-github-token.txt"
+          contenido=$(printf 'Control con GITHUB_TOKEN en %s\n' "$RAMA" | base64 -w0)
+          gh api -X PUT "repos/$REPO/contents/$ruta" \
+            -f message="experimento: control con GITHUB_TOKEN" -f content="$contenido" -f branch="$RAMA" --silent

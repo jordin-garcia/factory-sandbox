@@ -1,0 +1,40 @@
+name: experimento-automerge
+
+# Tarea 3, Step 9: activar la fusión automática de un PR con el token de la aplicación.
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Número del PR"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  activar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Token de la aplicación
+        id: token
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          app-id: ${{ vars.FACTORY_APP_ID }}
+          private-key: ${{ secrets.FACTORY_APP_PRIVATE_KEY }}
+      - name: enablePullRequestAutoMerge
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          PR: ${{ inputs.pr }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          id=$(gh api "repos/$REPO/pulls/$PR" --jq .node_id)
+          gh api graphql -f id="$id" -f query='
+            mutation($id: ID!) {
+              enablePullRequestAutoMerge(input: {pullRequestId: $id, mergeMethod: SQUASH}) {
+                pullRequest { number autoMergeRequest { enabledAt mergeMethod enabledBy { login } } }
+              }
+            }' --jq '.data.enablePullRequestAutoMerge.pullRequest'

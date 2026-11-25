@@ -1,0 +1,26 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Datos del evento (solo logins, sin secretos)
+        env:
+          ACTOR: ${{ github.actor }}
+          ACTOR_DISPARADOR: ${{ github.triggering_actor }}
+          AUTOR_PR: ${{ github.event.pull_request.user.login }}
+          ACCION: ${{ github.event.action }}
+        run: |
+          echo "accion=$ACCION"
+          echo "actor=$ACTOR"
+          echo "actor_disparador=$ACTOR_DISPARADOR"
+          echo "autor_pr=$AUTOR_PR"
+      - run: echo "ci correcto"

@@ -1,0 +1,76 @@
+name: experimento-check
+
+# Tarea 3, Step 8: publicar factory/aprobacion desde distintas fuentes
+# (GITHUB_TOKEN como check run o commit status; la aplicación como check run o status).
+on:
+  workflow_dispatch:
+    inputs:
+      fuente:
+        description: "Quién publica factory/aprobacion y cómo"
+        type: choice
+        options: [github_token_check, github_token_status, app_check, app_status]
+      sha:
+        description: "Commit (head del PR) sobre el que se publica"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  con-github-token:
+    if: startsWith(inputs.fuente, 'github_token')
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      statuses: write
+    steps:
+      - name: Publicar con GITHUB_TOKEN
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FUENTE: ${{ inputs.fuente }}
+          SHA: ${{ inputs.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ "$FUENTE" = "github_token_check" ]; then
+            gh api -X POST "repos/$REPO/check-runs" -f name="factory/aprobacion" -f head_sha="$SHA" \
+              -f status=completed -f conclusion=success \
+              -f 'output[title]=Experimento' -f 'output[summary]=Publicado con GITHUB_TOKEN' \
+              --jq '"check_run id=\(.id) app=\(.app.slug) app_id=\(.app.id)"'
+          else
+            gh api -X POST "repos/$REPO/statuses/$SHA" -f state=success -f context="factory/aprobacion" \
+              -f description="Publicado con GITHUB_TOKEN" \
+              --jq '"status id=\(.id) creador=\(.creator.login)"'
+          fi
+
+  con-app:
+    if: startsWith(inputs.fuente, 'app')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Token de la aplicación
+        id: token
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          app-id: ${{ vars.FACTORY_APP_ID }}
+          private-key: ${{ secrets.FACTORY_APP_PRIVATE_KEY }}
+      - name: Publicar con la aplicación
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          FUENTE: ${{ inputs.fuente }}
+          SHA: ${{ inputs.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ "$FUENTE" = "app_check" ]; then
+            gh api -X POST "repos/$REPO/check-runs" -f name="factory/aprobacion" -f head_sha="$SHA" \
+              -f status=completed -f conclusion=success \
+              -f 'output[title]=Experimento' -f 'output[summary]=Publicado con la aplicación' \
+              --jq '"check_run id=\(.id) app=\(.app.slug) app_id=\(.app.id)"'
+          else
+            gh api -X POST "repos/$REPO/statuses/$SHA" -f state=success -f context="factory/aprobacion" \
+              -f description="Publicado con la aplicación" \
+              --jq '"status id=\(.id) creador=\(.creator.login)"'
+          fi
